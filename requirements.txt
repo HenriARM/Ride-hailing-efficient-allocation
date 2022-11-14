@@ -1,4 +1,5 @@
 geopandas
 # matplotlib
 folium
+scikit-learn
 

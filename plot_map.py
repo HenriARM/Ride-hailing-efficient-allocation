@@ -42,10 +42,10 @@ img = Image.open(io.BytesIO(img_data))
 map_fn = f'map.png'
 img.save(map_fn)
 
-images = []
-for filename in filenames:
-    images.append(imageio.imread(filename))
-imageio.mimsave('map.gif', images)
+# images = []
+# for filename in filenames:
+#     images.append(imageio.imread(filename))
+# imageio.mimsave('map.gif', images)
 
 # TODO: if point goes out of view?
 
