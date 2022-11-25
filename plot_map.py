@@ -13,12 +13,12 @@ TALLINN_LAT_LONG = [59.436962, 24.753574]
 CIRCLE_RADIUS = 20
 m = folium.Map(location=TALLINN_LAT_LONG, tiles='openstreetmap', zoom_start=13)
 
-f = './robotex5.csv'
+f = './data/robotex5.csv'
 time_col = 'start_time'
 df = pd.read_csv(f, parse_dates=[time_col])
 df = df.sort_values(by=[time_col])
 
-df = df[:2000]
+# df = df[:2000]
 df['hour'] = df[time_col].dt.hour
 df['date'] = df[time_col].dt.date
 df['time'] = pd.to_datetime(df['date']) + pd.to_timedelta(df['hour'], unit='h')
@@ -53,10 +53,12 @@ for idx in range(len(list_of_points)):
         ).add_to(m)
     image_data = m._to_png(5)
     image = Image.open(io.BytesIO(image_data))
-    image.save(f'map_{idx}.png')
+    image.save(f'./map_{idx}.png')
 
-image_filenames = glob.glob('./*.png')
+image_filenames = glob.glob('./folium_maps_week/*.png')
 images = []
-for image_filename in image_filenames:
-    images.append(imageio.imread(image_filename))
-imageio.mimsave('map.gif', images, fps=2)
+# for image_filename in image_filenames:
+#     images.append(imageio.imread(image_filename))
+for idx in range(24 * 1):
+    images.append(imageio.imread(f'./folium_maps_week/map_{idx}.png'))
+imageio.mimsave('map_1.gif', images, fps=2)

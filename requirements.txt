@@ -2,4 +2,4 @@ geopandas
 # matplotlib
 folium
 scikit-learn
-
+seaborn
