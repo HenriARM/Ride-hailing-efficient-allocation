@@ -3,3 +3,4 @@ geopandas
 folium
 scikit-learn
 seaborn
+# hdbscan
