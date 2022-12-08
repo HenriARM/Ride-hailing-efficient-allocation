@@ -13,6 +13,7 @@ import io
 import folium
 import random
 from sklearn.metrics import silhouette_score
+from sklearn.metrics.pairwise import pairwise_kernels
 
 
 def get_centermost_point(cluster):
@@ -85,7 +86,7 @@ def create_map(data, cluster_col, num_clusters):
     for _, row in data.iterrows():
         folium.CircleMarker(
             location=[row['start_lat'], row['start_lng']],
-            radius=1,
+            radius=2,
             popup=row[cluster_col],
             color=cluster_colours[row[cluster_col]],
             fill=True,
@@ -107,6 +108,7 @@ def create_map(data, cluster_col, num_clusters):
 
 
 def save_map(map):
+    map.save(outfile='map.html')
     image_data = map._to_png(5)
     image = Image.open(io.BytesIO(image_data))
     image.save(f'map.png')
@@ -146,7 +148,7 @@ def plot_cluster_hist(df, cluster_col):
     df[cluster_col].value_counts().plot.hist(bins=70, alpha=0.5, label='hybrid')
     plt.legend()
     plt.grid(True)
-    plt.title('Comparing Hybrid and K-Means Approaches')
+    plt.title('Title')
     plt.xlabel('cluster sizes')
     plt.show()
     plt.savefig(f'{cluster_col}_hist.png')
@@ -189,29 +191,47 @@ def cluster_dbscan(coords):
     # epsilon = 1.5 / kms_per_radian
     epsilon = 0.05 / kms_per_radian
     # https://scikit-learn.org/stable/modules/generated/sklearn.cluster.DBSCAN.html#sklearn.cluster.DBSCAN
-    model = DBSCAN(eps=epsilon,
-                   min_samples=5,
-                   algorithm='ball_tree',
-                   metric='haversine').fit(np.radians(coords))
-    cluster_pred = model.labels_
-    return model, cluster_pred
+    model = DBSCAN(
+        eps=epsilon,
+        min_samples=5,
+        algorithm='ball_tree',
+        metric='haversine').fit(np.radians(coords))
+    return model, model.labels_
 
 
-# TODO:
-def cluster_spectral():
-    pass
+def cluster_spectral(coords):
+    from sklearn.cluster import SpectralClustering
+    from sklearn.metrics import pairwise_distances
+
+    # tmp
+    # coords_precomputed = pairwise_distances(np.radians(coords), metric='haversine')
+    # from sklearn.preprocessing import MinMaxScaler
+    # coords_precomputed = MinMaxScaler().fit_transform(coords_precomputed)
+    model = SpectralClustering(
+        n_clusters=10,
+        affinity='rbf',  # 'rbf', 'precomputed',  # 'cosine',
+        n_init=100,  # 100,
+        assign_labels='discretize',
+        random_state=0
+    ).fit(np.radians(coords))
+    # ).fit(coords_precomputed)
+    return model, model.labels_
 
 
-# TODO:
-def cluster_hdbscan():
-    # # Hierarchical DBSCAN uses different set of hyperparameters to find different levels of density reducing outliers
-    # import hdbscan
-    #
-    # model = hdbscan.HDBSCAN(min_cluster_size=5, min_samples=2, cluster_selection_epsilon=0.01)
-    # class_predictions = model.fit_predict(X)
-    # data['CLUSTER_hdbscan'] = class_predictions
-    # data.head()
-    pass
+def cluster_hdbscan(coords):
+    # Hierarchical DBSCAN uses different set of hyperparameters
+    # to find different levels of density reducing outliers
+    import hdbscan
+    kms_per_radian = 6371.0088
+    epsilon = 1 / kms_per_radian
+    model = hdbscan.HDBSCAN(
+        min_cluster_size=5,
+        min_samples=2,
+        cluster_selection_epsilon=epsilon,
+        # metric='haversine',
+        # algorithm='ball_tree'
+    ).fit(np.radians(coords))
+    return model, model.labels_
 
 
 def main():
@@ -224,14 +244,17 @@ def main():
     coords_df = preprocess(df)
     coords = coords_df.to_numpy()
 
-    model, cluster_pred = cluster_dbscan(coords)
+    # model, cluster_pred = cluster_dbscan(coords)
+    # model, cluster_pred = cluster_spectral(coords)
+    model, cluster_pred = cluster_hdbscan(coords)
     save_model(model, 'cluster.pickle')
 
     num_clusters = len(np.unique(cluster_pred))
     df['cluster'] = pd.Series(cluster_pred)
     df['cluster'] = df['cluster'].astype('int64', errors='ignore')
-
+    # TODO: cluster column is saved as float64
     # TODO: tmp outliers
+    # df = df[:997]
     df = df[:4042]
     df.to_csv('data/data_clustered.csv', index=False)
 
@@ -241,6 +264,15 @@ def main():
     # clusters (key: cluster_idx, value: list of points)
     clusters = pd.Series([coords[cluster_pred ==
                                  n] for n in range(num_clusters)])
+
+    # from folium import plugins
+    # m = folium.Map(location=[df['start_lat'].mean(), df['start_lng'].mean()], zoom_start=13, tiles='openstreetmap')
+    # # heat_data = list(zip(df['start_lat'], df['start_lng']))
+    # for i in range(len(clusters)):
+    #     # folium.plugins.HeatMap(clusters[i]).add_to(m)
+    #     if clusters[i].shape[0] != 0:
+    #         plugins.MarkerCluster(clusters[i], popups=list(np.ones(len(clusters[i])) * i)).add_to(m)
+
     centermost_points = clusters.map(get_centermost_point)
     save_centroids_as_json(centermost_points)
 
@@ -252,5 +284,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-# TODO: plot cluster not with points but whole area (maybe as a convex hull)
